@@ -1,0 +1,150 @@
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, doc, getDocFromServer, enableIndexedDbPersistence, enableMultiTabIndexedDbPersistence, Firestore } from 'firebase/firestore';
+import firebaseConfig from '../../firebase-applet-config.json';
+
+const app = initializeApp(firebaseConfig);
+
+const configDbId = firebaseConfig.firestoreDatabaseId || undefined;
+
+export const db: Firestore = (() => {
+  try {
+    return configDbId ? getFirestore(app, configDbId) : getFirestore(app);
+  } catch (e) {
+    console.warn('Initial Firestore setup error, defaulting to (default):', e);
+    return getFirestore(app);
+  }
+})();
+
+export const auth = getAuth(app);
+
+// Enable Firestore offline persistence for subterranean operations (SMI Imiter isolated network)
+const isPersistenceSafe = () => {
+  try {
+    // If in an iframe (like AI Studio preview), disable offline persistence to prevent 30-second hangs
+    if (typeof window !== 'undefined' && window.self !== window.top) {
+      console.info('Firestore: running inside iframe. Disabling offline persistence for performance.');
+      return false;
+    }
+    if (typeof window === 'undefined' || !('indexedDB' in window)) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+if (isPersistenceSafe()) {
+  enableMultiTabIndexedDbPersistence(db)
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        // Fallback to single-tab persistence if multi-tab fails
+        return enableIndexedDbPersistence(db);
+      }
+      throw err;
+    })
+    .catch((err) => {
+      if (err.code === 'failed-precondition') {
+        console.warn('Firestore offline persistence failed: Multiple tabs open without multi-tab support.');
+      } else if (err.code === 'unimplemented') {
+        console.warn('Firestore offline persistence is not supported by this browser.');
+      } else {
+        console.warn('Firestore offline persistence error:', err);
+      }
+    });
+} else {
+  console.info('Firestore offline persistence disabled (iframe or unsupported environment).');
+}
+
+// Connectivity check
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    console.info(`Firestore connected successfully.`);
+  } catch (error: any) {
+    const errMsg = error?.message || String(error);
+    if (errMsg.includes('the client is offline')) {
+      console.warn("Firestore is offline or config is missing.");
+    } else {
+      console.warn("Firestore connection check info:", errMsg);
+    }
+  }
+}
+testConnection();
+
+// Centralized error handling as mandated by Firebase Skill
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+export enum NonRealisationCause {
+  BARRE_CONIQUE_CASSEE = 'barre_conique_cassee',
+  CHANTIER_DANGER = 'chantier_danger',
+  TAILLANT_MAUVAIS_ETAT = 'taillant_mauvais_etat',
+  ROCHES_DURES = 'roches_dures',
+  MANQUE_PERSONNEL = 'manque_personnel',
+  PANNE_ENGIN = 'panne_engin',
+  CHANTIER_NON_DEBLAYE = 'chantier_non_deblaye',
+  PANNE_CHARGEUSE_LHD = 'panne_chargeuse_lhd',
+  MANQUE_CONDUCTEUR = 'manque_conducteur',
+  VOIE_ENCOMBREE = 'voie_encombree',
+  PROBLEME_VENTILATION = 'probleme_ventilation',
+  ARRET_CONSIGNATION = 'arret_consignation',
+  MANQUE_GASOIL = 'manque_gasoil',
+  PANNE_TREUIL = 'panne_treuil',
+  PROBLEME_VOIE = 'probleme_voie',
+  MANQUE_WAGONS = 'manque_wagons',
+  ARRET_ELECTRIQUE = 'arret_electrique',
+  MANQUE_EQUIPIERS = 'manque_equipiers',
+  BOURRAGE_BURE = 'bourrage_bure',
+  PIECE_INDISPONIBLE = 'piece_indisponible',
+  DIAGNOSTIC_COMPLEXE = 'diagnostic_complexe',
+  ARRET_SECURITE = 'arret_securite',
+  MANQUE_PERSONNEL_TECHNIQUE = 'manque_personnel_technique',
+  PRIORITE_CHANGEE = 'priorite_changee',
+  AUTRE = 'autre'
+}

@@ -1,0 +1,634 @@
+import React, { useState } from 'react';
+import { motion } from 'motion/react';
+import { Activity, Info, Award, ShieldAlert, TrendingUp } from 'lucide-react';
+
+import { GabaritType } from './types';
+import { getExplosifsData } from './explosifsCalc';
+import { useAuth } from '../../contexts/AuthContext';
+import bannerExcellenceImg from '../../assets/images/Banner excellence.jpg';
+
+interface CalculsTabProps {
+  gabarit: GabaritType;
+}
+
+export const CalculsTab: React.FC<CalculsTabProps> = ({ gabarit }) => {
+  const { profile } = useAuth();
+  const canSeePrime = profile?.role === 'admin' || profile?.role === 'direction_technique';
+
+  const is9m2 = gabarit.startsWith('9m2');
+  const initialHoles = gabarit === '9m2_intl' ? 30 : is9m2 ? 28 : 38;
+
+  const [rodType, setRodType] = useState<'1.8' | '2.4'>('1.8');
+  const [numHoles, setNumHoles] = useState<number>(initialHoles);
+  
+  // Depth defaults to 1.7 for 1.8m rod, and 2.3 for 2.4m rod
+  const defaultDepth = rodType === '1.8' ? 1.7 : 2.3;
+  const [drillDepth, setDrillDepth] = useState<number>(defaultDepth);
+
+  const [divergenceAngle, setDivergenceAngle] = useState<number>(0);
+
+  // When gabarit changes, we should also handle state sync or update
+  React.useEffect(() => {
+    setNumHoles(initialHoles);
+  }, [gabarit, initialHoles]);
+
+  // When rod type changes, update the default depth
+  const handleRodChange = (type: '1.8' | '2.4') => {
+    setRodType(type);
+    setDrillDepth(type === '1.8' ? 1.7 : 2.3);
+  };
+
+  // MATHEMATICAL ESTIMATES
+  const explosifs = getExplosifsData(gabarit, rodType);
+  // Loaded holes and empty holes based on gabarit
+  const emptyHolesCount = explosifs.emptyHoles;
+  const loadedHoles = Math.max(0, numHoles - emptyHolesCount);
+
+  // ANFO consumption:
+  const anfoPerHole = explosifs.anfoKgPerHole;
+  const totalAnfoKg = loadedHoles * anfoPerHole;
+
+  // Tovex consumption:
+  const totalTovexKg = explosifs.tovexKgTotal;
+
+  // Detonator count matches loaded holes
+  const detonatorsCount = loadedHoles;
+
+  // Expected footage pulled (assuming 100% yield for perfect alignment)
+  const expectedFootage = drillDepth;
+
+  // Miner cash bonus is 35 MAD per meter pulled
+  const minerBonusMAD = expectedFootage * 35;
+
+  // Custom Chart alignment quality selected state
+  const [deviationLevel, setDeviationLevel] = useState<'perfect' | 'minor' | 'major'>('perfect');
+
+  const getChartData = () => {
+    const foré = drillDepth;
+    let arraché = drillDepth;
+    let rate = 100;
+
+    if (deviationLevel === 'minor') {
+      arraché = Number((drillDepth * 0.80).toFixed(2));
+      rate = 80;
+    } else if (deviationLevel === 'major') {
+      arraché = Number((drillDepth * 0.50).toFixed(2));
+      rate = 50;
+    }
+
+    return { foré, arraché, rate };
+  };
+
+  const chart = getChartData();
+
+  const drilledLength = rodType === '1.8' ? 1.7 : 2.3;
+  const lossPerHole = parseFloat(
+    (drilledLength * Math.tan((divergenceAngle * Math.PI) / 180)).toFixed(3)
+  );
+  const effectiveMeterage = parseFloat(
+    Math.max(0, drilledLength - lossPerHole).toFixed(3)
+  );
+  const efficiencyPct = parseFloat(
+    ((effectiveMeterage / drilledLength) * 100).toFixed(1)
+  );
+
+  const totalHoles = explosifs.loadedHoles;
+  const totalLoss = parseFloat((lossPerHole * totalHoles).toFixed(2));
+
+  const severityLevel =
+    divergenceAngle === 0 ? 'perfect' :
+    divergenceAngle <= 1 ? 'excellent' :
+    divergenceAngle <= 2 ? 'acceptable' :
+    divergenceAngle <= 3 ? 'warning' : 'critical';
+
+  const severityConfig = {
+    perfect:    { label: 'FORAGE PARFAIT',    color: 'text-emerald-600', bg: 'bg-emerald-50',  border: 'border-emerald-300' },
+    excellent:  { label: 'EXCELLENT',         color: 'text-emerald-500', bg: 'bg-emerald-50',  border: 'border-emerald-200' },
+    acceptable: { label: 'ACCEPTABLE',        color: 'text-amber-600',   bg: 'bg-amber-50',    border: 'border-amber-300'   },
+    warning:    { label: 'ATTENTION',         color: 'text-orange-600',  bg: 'bg-orange-50',   border: 'border-orange-400'  },
+    critical:   { label: 'CRITIQUE — REFORER',color: 'text-rose-700',    bg: 'bg-rose-50',     border: 'border-rose-500',   },
+  };
+  const severity = severityConfig[severityLevel];
+
+  const referenceRows = [
+    { angle: 0, p18: '0.000 m', p24: '0.000 m', loss18: '0.00 m', verdict: '✅ Parfait' },
+    { angle: 0.5, p18: '0.015 m', p24: '0.020 m', loss18: '0.52 m', verdict: '✅ Excellent' },
+    { angle: 1, p18: '0.030 m', p24: '0.040 m', loss18: '1.04 m', verdict: '✅ Bon' },
+    { angle: 1.5, p18: '0.044 m', p24: '0.060 m', loss18: '1.55 m', verdict: '⚠️ Acceptable' },
+    { angle: 2, p18: '0.059 m', p24: '0.080 m', loss18: '2.07 m', verdict: '⚠️ Attention' },
+    { angle: 2.5, p18: '0.074 m', p24: '0.100 m', loss18: '2.59 m', verdict: '🟠 Risqué' },
+    { angle: 3, p18: '0.089 m', p24: '0.121 m', loss18: '3.11 m', verdict: '🔴 Critique' },
+    { angle: 5, p18: '0.149 m', p24: '0.201 m', loss18: '5.20 m', verdict: '🔴 Reforer' },
+    { angle: 8, p18: '0.239 m', p24: '0.323 m', loss18: '8.36 m', verdict: '⛔ Inacceptable' },
+  ];
+
+  let closestIndex = 0;
+  let minDiff = Infinity;
+  referenceRows.forEach((rowItem, idx) => {
+    const diff = Math.abs(divergenceAngle - rowItem.angle);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestIndex = idx;
+    }
+  });
+
+  return (
+    <div className="space-y-8 bg-white rounded-3xl p-6 border border-slate-100 shadow-xs">
+      
+      {/* HEADER */}
+      <div className="border-b border-slate-100 pb-4">
+        <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest block">
+          Calculateur prévisionnel & économie minière
+        </span>
+        <h2 className="text-xl font-black uppercase tracking-widest text-slate-900 mt-1">
+          Simulateur Interactif de Volée & Rendement financier
+        </h2>
+        <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mt-0.5">
+          Modélisez la consommation d'explosifs et calculez la prime de rendement par mineur
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* INPUTS PANEL (5 Columns) */}
+        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
+          <h3 className="text-xs font-black uppercase text-slate-900 border-b border-slate-100 pb-3">
+            Paramètres du front de taille
+          </h3>
+
+          {/* Rod selector */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-black uppercase text-slate-400 block">Type de tige de forage</span>
+            <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
+              <button
+                onClick={() => handleRodChange('1.8')}
+                className={`py-2 rounded-lg text-xs font-black uppercase transition-all ${
+                  rodType === '1.8'
+                    ? 'bg-slate-950 text-white shadow'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                1.8 m (Tige courte)
+              </button>
+              <button
+                onClick={() => handleRodChange('2.4')}
+                className={`py-2 rounded-lg text-xs font-black uppercase transition-all ${
+                  rodType === '2.4'
+                    ? 'bg-slate-950 text-white shadow'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                2.4 m (Tige longue)
+              </button>
+            </div>
+          </div>
+
+          {/* Holes Input */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-700 uppercase">Nombre total de trous forés :</span>
+              <span className="font-mono font-black text-slate-900 bg-slate-100 px-2.5 py-1 rounded">
+                {numHoles} trous
+              </span>
+            </div>
+            <input
+              type="range"
+              min={is9m2 ? 20 : 30}
+              max={is9m2 ? 32 : 42}
+              step="1"
+              value={numHoles}
+              onChange={(e) => setNumHoles(parseInt(e.target.value))}
+              className="w-full accent-amber-500 bg-slate-200 h-2 rounded-lg cursor-pointer"
+            />
+            <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase">
+              <span>Min : {is9m2 ? 20 : 30} trous</span>
+              <span>{is9m2 ? 'Idéal (9m²) : 28 trous' : 'Idéal (12m²) : 38 trous'}</span>
+              <span>Max : {is9m2 ? 32 : 42} trous</span>
+            </div>
+          </div>
+
+          {/* Depth Input */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-bold text-slate-700 uppercase">Profondeur de forage réelle :</span>
+              <span className="font-mono font-black text-slate-900 bg-slate-100 px-2.5 py-1 rounded">
+                {drillDepth.toFixed(2)} m
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1.0"
+              max="3.0"
+              step="0.1"
+              value={drillDepth}
+              onChange={(e) => setDrillDepth(parseFloat(e.target.value))}
+              className="w-full accent-amber-500 bg-slate-200 h-2 rounded-lg cursor-pointer"
+            />
+            <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase">
+              <span>Min : 1.0 m</span>
+              <span>Max : 3.0 m</span>
+            </div>
+          </div>
+        </div>
+
+        {/* PREVISIONNEL OUTPUTS (7 Columns) */}
+        <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* OUTPUT CARD 1: EXPLO DOSES */}
+          <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 space-y-4">
+            <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider border-b border-slate-200/50 pb-2">
+              Doses d'Explosifs Modélisées
+            </h4>
+            <div className="space-y-3.5 text-xs font-semibold">
+              <div className="flex justify-between">
+                <span className="text-slate-400 uppercase text-[9px]">Trous de mine chargés :</span>
+                <span className="text-slate-800 font-extrabold">{loadedHoles} trous</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 uppercase text-[9px]">Trous vides d'expansion :</span>
+                <span className="text-slate-800 font-extrabold text-blue-600">3 trous (V)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 uppercase text-[9px]">Volume ANFO requis :</span>
+                <span className="text-slate-900 font-black">{totalAnfoKg.toFixed(1)} kg</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 uppercase text-[9px]">Hydrogel Tovex requis :</span>
+                <span className="text-slate-900 font-black">{totalTovexKg.toFixed(1)} kg</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 uppercase text-[9px]">Amorces électroniques :</span>
+                <span className="text-slate-950 font-black text-amber-600">{detonatorsCount} unités</span>
+              </div>
+            </div>
+          </div>
+
+          {/* OUTPUT CARD 2: INCOME ESTIMATE */}
+          <div className="bg-amber-400/5 border border-amber-400/20 rounded-2xl p-6 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <span className="text-[9px] font-black uppercase text-amber-600 bg-amber-400/10 px-2 py-0.5 rounded inline-block">
+                SMI Prime de Rendement
+              </span>
+              <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">
+                GAINS ESTIMÉS PAR MINEUR / VOLÉE
+              </h4>
+            </div>
+
+            {canSeePrime ? (
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase text-slate-400">Prime d'Avancement</span>
+                <p className="text-3xl font-black text-slate-950 tracking-tight">
+                  {minerBonusMAD.toFixed(2)} MAD
+                </p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase">
+                  Base officielle de 35 MAD par mètre arraché
+                </p>
+              </div>
+            ) : (
+              <div className="bg-slate-100 border border-slate-200 rounded-xl p-4 text-center">
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-wider">
+                  🔒 Information réservée à la Direction Technique
+                </p>
+              </div>
+            )}
+
+            <div className="bg-white border border-amber-400/20 p-3 rounded-xl flex items-center gap-2.5">
+              <Award className="w-5 h-5 text-amber-500 shrink-0" />
+              <p className="text-[10px] font-semibold text-slate-600 leading-relaxed">
+                Chaque mètre foré supplémentaire avec des tiges de 2.4m augmente la prime d'avancement mensuelle de près de <strong>1 400 MAD</strong> par mineur.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* COMPARATIVE SECTION 1.8M VS 2.4M */}
+      <div className="space-y-4 pt-4 border-t border-slate-100">
+        <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider">
+          Comparaison d'Efficacité : Tige 1.8 m vs Tige 2.4 m
+        </h3>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
+            <thead className="bg-slate-900 text-white font-black uppercase text-[10px] tracking-wider">
+              <tr>
+                <th className="p-4">Paramètre opérationnel (SMI)</th>
+                <th className="p-4 text-center">Tige 1.8 mètres</th>
+                <th className="p-4 text-center text-[#ffd700]">Tige 2.4 mètres</th>
+                <th className="p-4 text-center text-emerald-400">Écart / Gain</th>
+              </tr>
+            </thead>
+            <tbody className="font-semibold text-slate-700 divide-y divide-slate-100">
+              <tr>
+                <td className="p-4 font-extrabold text-slate-900">Profondeur théorique du trou</td>
+                <td className="p-4 text-center">1.80 m</td>
+                <td className="p-4 text-center">2.40 m</td>
+                <td className="p-4 text-center text-slate-800 font-extrabold">+0.60 m</td>
+              </tr>
+              <tr>
+                <td className="p-4 font-extrabold text-slate-900">Métrage arraché optimal</td>
+                <td className="p-4 text-center">1.70 m</td>
+                <td className="p-4 text-center">2.30 m</td>
+                <td className="p-4 text-center text-slate-800 font-extrabold">+0.60 m (100% pull)</td>
+              </tr>
+              <tr>
+                <td className="p-4 font-extrabold text-slate-900">Sacs d'ANFO nécessaires</td>
+                <td className="p-4 text-center">{is9m2 ? "24.5 kg" : "36.8 kg"}</td>
+                <td className="p-4 text-center">{is9m2 ? "40.1 kg" : "42.5 kg"}</td>
+                <td className="p-4 text-center text-slate-500 font-normal">{is9m2 ? "+15.6 kg de charge" : "+5.7 kg de charge"}</td>
+              </tr>
+              <tr>
+                <td className="p-4 font-extrabold text-slate-900">Temps de cycle forage</td>
+                <td className="p-4 text-center">45 min</td>
+                <td className="p-4 text-center">60 min</td>
+                <td className="p-4 text-center text-slate-500 font-normal">+15 minutes de forage</td>
+              </tr>
+              <tr className="bg-amber-400/5">
+                <td className="p-4 font-black text-slate-900">Prime de rendement par volée</td>
+                <td className="p-4 text-center font-extrabold">59.50 MAD</td>
+                <td className="p-4 text-center font-black text-slate-900">80.50 MAD</td>
+                <td className="p-4 text-center text-emerald-600 font-black">+21.00 MAD (+35%)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* INTERACTIVE ALIGNMENT IMPACT CHART (SVG GRAPHIQUE) */}
+      <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200/60 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <span className="text-[9px] font-black uppercase text-amber-600 tracking-wider block">Étude physique de rendement</span>
+            <h4 className="text-xs font-black uppercase text-slate-900 mt-0.5">
+              Impact de l'alignement des trous sur le métrage arraché réel
+            </h4>
+          </div>
+          
+          {/* Quality Selector */}
+          <div className="flex bg-white border border-slate-200 rounded-xl p-1 gap-1 shadow-sm">
+            <button
+              onClick={() => setDeviationLevel('perfect')}
+              className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors ${
+                deviationLevel === 'perfect'
+                  ? 'bg-emerald-500 text-white'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Parallèle (100%)
+            </button>
+            <button
+              onClick={() => setDeviationLevel('minor')}
+              className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors ${
+                deviationLevel === 'minor'
+                  ? 'bg-amber-500 text-slate-950 font-black'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Déviation Légère (80%)
+            </button>
+            <button
+              onClick={() => setDeviationLevel('major')}
+              className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors ${
+                deviationLevel === 'major'
+                  ? 'bg-rose-500 text-white'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Divergence Majeure (50%)
+            </button>
+          </div>
+        </div>
+
+        {/* DUAL SVG BAR CHART */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+          
+          {/* Left panel metrics (4 columns) */}
+          <div className="md:col-span-4 space-y-4 text-xs">
+            <div className="bg-white border border-slate-100 p-4 rounded-xl space-y-3 shadow-xs">
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Avancement théorique :</p>
+                <p className="text-sm font-black text-slate-800">{drillDepth.toFixed(2)} mètres</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Métrage arraché réel :</p>
+                <p className="text-sm font-black text-slate-900">{chart.arraché.toFixed(2)} mètres</p>
+              </div>
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-[9px] font-bold text-slate-400 uppercase">Taux de réussite :</p>
+                <p className={`text-base font-black ${
+                  chart.rate === 100 ? 'text-emerald-500' : chart.rate === 80 ? 'text-amber-500' : 'text-rose-500'
+                }`}>{chart.rate}% du forage récupéré</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Dual bar chart graphic (8 columns) */}
+          <div className="md:col-span-8 bg-white border border-slate-100 p-4 rounded-xl shadow-xs">
+            <svg viewBox="0 0 500 200" className="w-full h-auto">
+              {/* Grid lines */}
+              <line x1="50" y1="160" x2="450" y2="160" stroke="#cbd5e1" strokeWidth="2" />
+              <line x1="50" y1="110" x2="450" y2="110" stroke="#f1f5f9" strokeWidth="1" />
+              <line x1="50" y1="60" x2="450" y2="60" stroke="#f1f5f9" strokeWidth="1" />
+
+              {/* BAR 1 : METRAGE FORE */}
+              {/* X position 120 */}
+              <rect x="130" y={160 - (100 * 1.1)} width="50" height={100 * 1.1} fill="#64748b" rx="4" />
+              <text x="155" y={160 - (100 * 1.1) - 8} textAnchor="middle" className="font-mono text-[10px] font-black fill-slate-700">
+                {drillDepth.toFixed(1)} m
+              </text>
+
+              {/* BAR 2 : METRAGE ARRACHE (Dynamic height based on deviation) */}
+              {/* X position 280 */}
+              <rect
+                x="280"
+                y={160 - (chart.rate * 1.1)}
+                width="50"
+                height={chart.rate * 1.1}
+                fill={chart.rate === 100 ? '#10b981' : chart.rate === 80 ? '#f59e0b' : '#ef4444'}
+                rx="4"
+              />
+              <text x="305" y={160 - (chart.rate * 1.1) - 8} textAnchor="middle" className="font-mono text-[10px] font-black fill-slate-900">
+                {chart.arraché.toFixed(1)} m
+              </text>
+
+              {/* Labels on X Axis */}
+              <text x="155" y="180" textAnchor="middle" className="text-[10px] font-black uppercase fill-slate-500">Métrage Foré</text>
+              <text x="305" y="180" textAnchor="middle" className="text-[10px] font-black uppercase fill-slate-700">Métrage Arraché</text>
+            </svg>
+          </div>
+
+        </div>
+
+        {/* ANALYSIS ADVICE */}
+        <p className="text-[10.5px] font-bold text-slate-500 leading-relaxed italic uppercase">
+          * Les statistiques minières de la SMI prouvent que 90% des pertes de métrage (les culots de trous de plus de 40 cm) résultent d'un manque de parallélisme lors du forage. Un trou dévié s'éloigne de son voisin, augmentant la ligne de moindre résistance au-delà de la puissance d'abattage des gaz.
+        </p>
+
+      </div>
+
+      <div className="space-y-6 pt-6 border-t border-slate-100">
+        <div className="p-6 md:p-8 rounded-3xl border border-amber-500/30 shadow-xl relative overflow-hidden text-white">
+          {/* Banner Image Background */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
+            style={{ backgroundImage: `url(${bannerExcellenceImg})` }}
+          />
+          <div className="relative z-10">
+            <h3 className="text-sm md:text-base font-black uppercase tracking-wider text-white drop-shadow-sm">
+              📐 Simulateur de Divergence de Forage
+            </h3>
+            <p className="text-[10px] text-amber-200 font-semibold uppercase tracking-wider mt-0.5 drop-shadow-xs">
+              Impact de l'angle de déviation sur le métrage arraché
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-5">
+          <div className="space-y-2">
+            <span className="text-[10px] font-black uppercase text-slate-400 block">Tige utilisée</span>
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => handleRodChange('1.8')}
+                className={`py-2 rounded-lg text-xs font-black uppercase transition-all ${
+                  rodType === '1.8'
+                    ? 'bg-slate-900 text-white shadow'
+                    : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                1.8 m (forage 1.7 m)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRodChange('2.4')}
+                className={`py-2 rounded-lg text-xs font-black uppercase transition-all ${
+                  rodType === '2.4'
+                    ? 'bg-slate-900 text-white shadow'
+                    : 'text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                2.4 m (forage 2.3 m)
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-700 uppercase">
+                Angle de divergence : {divergenceAngle}°
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase">
+                (0° = parallèle parfait — objectif terrain)
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={8}
+              step={0.5}
+              value={divergenceAngle}
+              onChange={(e) => setDivergenceAngle(parseFloat(e.target.value))}
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500"
+            />
+            <div className="flex justify-between text-[9px] text-slate-400 font-bold px-1">
+              <span>0°</span>
+              <span>1°</span>
+              <span>2°</span>
+              <span>3°</span>
+              <span>4°</span>
+              <span>5°</span>
+              <span>6°</span>
+              <span>7°</span>
+              <span>8°</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs">
+            <div className="space-y-1">
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Métrage arraché effectif</span>
+              <p className={`text-3xl font-black ${severity.color}`}>
+                {effectiveMeterage.toFixed(2)} m
+              </p>
+            </div>
+            <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">
+              Foré : {drilledLength} m
+            </p>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs">
+            <div className="space-y-1">
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Perte par trou (culot)</span>
+              <p className={`text-2xl font-black ${lossPerHole > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {lossPerHole.toFixed(3)} m
+              </p>
+            </div>
+            <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">
+              Sur {totalHoles} trous chargés
+            </p>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs">
+            <div className="space-y-1">
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Perte totale volée</span>
+              <p className={`text-2xl font-black ${totalLoss > 0 ? 'text-rose-700' : 'text-emerald-600'}`}>
+                {totalLoss} m
+              </p>
+            </div>
+            <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">
+              Soit {(100 - efficiencyPct).toFixed(1)}% du forage perdu
+            </p>
+          </div>
+        </div>
+
+        <div className={`${severity.bg} ${severity.border} border-2 rounded-2xl p-4 text-center`}>
+          <span className={`text-lg font-black uppercase tracking-wider ${severity.color}`}>
+            {severity.label}
+          </span>
+          <p className="text-xs text-slate-600 mt-1 font-semibold">
+            {divergenceAngle === 0 && "Trous parfaitement parallèles — 100% du métrage arraché."}
+            {divergenceAngle > 0 && divergenceAngle <= 1 && "Écart minimal — acceptable en conditions terrain normales."}
+            {divergenceAngle > 1 && divergenceAngle <= 2 && "Vérifier l'alignement du guide de forage avant de continuer."}
+            {divergenceAngle > 2 && divergenceAngle <= 3 && "Risque de culots importants. Contrôle gabarit obligatoire."}
+            {divergenceAngle > 3 && "Arrêter le forage. Reforer les trous déviant de plus de 3°. Perte de métrage inacceptable."}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">
+            Tableau de référence — Impact angle × tige
+          </h4>
+          <div className="overflow-x-auto border border-slate-200 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900 text-white font-black uppercase text-[10px] tracking-wider">
+                <tr>
+                  <th className="p-3">Angle</th>
+                  <th className="p-3">Perte/trou (1.8m)</th>
+                  <th className="p-3">Perte/trou (2.4m)</th>
+                  <th className="p-3">Perte volée (1.8m)</th>
+                  <th className="p-3">Verdict</th>
+                </tr>
+              </thead>
+              <tbody className="font-semibold text-slate-700 divide-y divide-slate-100">
+                {referenceRows.map((rowItem, idx) => {
+                  const isClosest = idx === closestIndex;
+                  return (
+                    <tr key={idx} className={`${isClosest ? 'bg-amber-100' : 'odd:bg-white even:bg-slate-50/50'}`}>
+                      <td className="p-3 font-bold">{rowItem.angle}°</td>
+                      <td className="p-3 font-mono">{rowItem.p18}</td>
+                      <td className="p-3 font-mono">{rowItem.p24}</td>
+                      <td className="p-3 font-mono">{rowItem.loss18}</td>
+                      <td className="p-3 font-bold">{rowItem.verdict}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

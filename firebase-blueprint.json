@@ -1,0 +1,316 @@
+{
+  "entities": {
+    "Site": {
+      "title": "Site",
+      "description": "Mining site definition",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "managerId": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Platform user with roles and site access",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["secretary", "responsible", "chief", "direction", "admin"] },
+        "siteIds": { "type": "array", "items": { "type": "string" } },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["email", "role"]
+    },
+    "Production": {
+      "title": "Production",
+      "description": "Daily consolidated production record containing all posts for the day",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["brouillon", "planifie", "en_cours", "scelle"] },
+        "postes": { "type": "object" },
+        "operator": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["date", "status"]
+    },
+    "Chantier": {
+      "title": "Chantier",
+      "description": "Specific mining advancement area",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "siteId": { "type": "string" },
+        "sector": { "type": "string" },
+        "managerName": { "type": "string" },
+        "galleryType": { "type": "string", "enum": ["9m2", "12m2"] },
+        "status": { "type": "string", "enum": ["ouvert", "fermé"] },
+        "targetMeterage": { "type": "number" }
+      },
+      "required": ["name", "siteId", "status"]
+    },
+    "Engine": {
+      "title": "Engine",
+      "description": "Mining equipment/machinery",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["perforateur", "camion", "pelle", "autre"] },
+        "siteId": { "type": "string" },
+        "status": { "type": "string", "enum": ["operational", "maintenance", "broken"] },
+        "engineHours": { "type": "number" },
+        "fuelLevel": { "type": "number" },
+        "lastMaintenanceDate": { "type": "string" }
+      },
+      "required": ["id", "name", "type"]
+    },
+    "MaintenanceOrder": {
+      "title": "MaintenanceOrder",
+      "description": "Service record for engines",
+      "type": "object",
+      "properties": {
+        "engineId": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string", "enum": ["preventive", "corrective"] },
+        "description": { "type": "string" },
+        "cost": { "type": "number" },
+        "technicianId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] }
+      },
+      "required": ["engineId", "date", "type"]
+    },
+    "Stock": {
+      "title": "Stock",
+      "description": "Consumables inventory per site",
+      "type": "object",
+      "properties": {
+        "siteId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "minThreshold": { "type": "number" }
+      },
+      "required": ["siteId", "itemName", "quantity"]
+    },
+    "Personnel": {
+      "title": "Personnel",
+      "description": "Mining staff database",
+      "type": "object",
+      "properties": {
+        "matricule": { "type": "string" },
+        "nom": { "type": "string" },
+        "prenom": { "type": "string" },
+        "fonction": { "type": "string" },
+        "siteId": { "type": "string" },
+        "status": { "type": "string", "enum": ["actif", "inactif"] },
+        "sector": { "type": "string" },
+        "currentPost": { "type": "string", "enum": ["Poste 1", "Poste 2", "Poste 3"] },
+        "rotationGroup": { "type": "string" }
+      },
+      "required": ["matricule", "nom", "prenom", "fonction"]
+    },
+    "RotationHistory": {
+      "title": "RotationHistory",
+      "description": "Log of weekly post rotations",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "appliedBy": { "type": "string" },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "employeeId": { "type": "string" },
+              "matricule": { "type": "string" },
+              "name": { "type": "string" },
+              "fonction": { "type": "string" },
+              "sector": { "type": "string" },
+              "fromPost": { "type": "string" },
+              "toPost": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["date", "appliedBy", "changes"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Traceability log for all sensitive actions",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string" },
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "targetId": { "type": "string" },
+        "details": { "type": "object" },
+        "geo": { "type": "object" }
+      },
+      "required": ["timestamp", "userId", "action"]
+    },
+    "DailyPlanningSheet": {
+      "title": "DailyPlanningSheet",
+      "description": "Daily consolidated planning record containing all posts for the day",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["brouillon", "planifie", "en_cours", "scelle"] },
+        "postes": { "type": "object" },
+        "operator": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["date", "status"]
+    },
+    "Planning": {
+      "title": "Planning",
+      "description": "Individual assignment item inside a planning list",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "post": { "type": "string" },
+        "chantierId": { "type": "string" },
+        "engineCode": { "type": "string" },
+        "minerMatricule": { "type": "string" },
+        "assistantMatricule": { "type": "string" }
+      },
+      "required": ["date", "post", "chantierId"]
+    },
+    "ProductionHistory": {
+      "title": "ProductionHistory",
+      "description": "Internal logs tracking sheet validations and locks",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "DeletedPlanningLog": {
+      "title": "DeletedPlanningLog",
+      "description": "Log of deleted planning books",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "deletedBy": { "type": "string" },
+        "deletedAt": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["date", "deletedBy", "deletedAt"]
+    },
+    "ModificationRequest": {
+      "title": "ModificationRequest",
+      "description": "Request to modify/reopen a locked planning sheet",
+      "type": "object",
+      "properties": {
+        "requestedBy": { "type": "string" },
+        "requestedByUid": { "type": "string" },
+        "requestedAt": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "approvedBy": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "reopenUntil": { "type": "string" }
+      },
+      "required": ["requestedBy", "requestedByUid", "requestedAt", "reason", "status"]
+    },
+    "NonRealisationExplanation": {
+      "title": "NonRealisationExplanation",
+      "description": "Explanation for production gap of non-realisation",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "poste": { "type": "string" },
+        "chantierId": { "type": "string" },
+        "chantierName": { "type": "string" },
+        "activity": { "type": "string" },
+        "activityLabel": { "type": "string" },
+        "plannedValue": { "type": "number" },
+        "realValue": { "type": "number" },
+        "gapPercent": { "type": "number" },
+        "cause": { "type": "string" },
+        "causeLabel": { "type": "string" },
+        "otherDetails": { "type": "string" },
+        "reportedBy": { "type": "string" },
+        "reportedByUid": { "type": "string" },
+        "reportedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "explained", "unjustified"] }
+      },
+      "required": ["date", "poste", "chantierId", "activity", "cause", "status"]
+    },
+    "SystemMessage": {
+      "title": "SystemMessage",
+      "description": "Critical communications, real-time messaging, notifications, read status, and telemetry tracking",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "senderName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "targetRole": { "type": "string" },
+        "targetUserEmail": { "type": "string" },
+        "urgency": { "type": "string" },
+        "reads": { "type": "object" }
+      },
+      "required": ["title", "body", "senderEmail", "createdAt"]
+    },
+    "FailedBlast": {
+      "title": "FailedBlast",
+      "description": "Central registry of failed mine blasts for production gap tracing",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "sector": { "type": "string" },
+        "post": { "type": "string" },
+        "chantierId": { "type": "string" },
+        "plannedMeterage": { "type": "number" },
+        "realMeterage": { "type": "number" },
+        "cause": { "type": "string" },
+        "otherCauseComment": { "type": "string" },
+        "comment": { "type": "string" },
+        "reportedBy": { "type": "string" },
+        "reportedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "explained", "unjustified"] },
+        "siteId": { "type": "string" }
+      },
+      "required": ["date", "sector", "post", "chantierId", "plannedMeterage", "realMeterage", "cause", "status", "siteId"]
+    },
+    "BannedIp": {
+      "title": "BannedIp",
+      "description": "Banned IP addresses for security firewall",
+      "type": "object",
+      "properties": {
+        "reason": { "type": "string" },
+        "bannedAt": { "type": "string" },
+        "bannedBy": { "type": "string" }
+      },
+      "required": ["reason", "bannedAt", "bannedBy"]
+    }
+  },
+  "firestore": {
+    "/sites": { "schema": "Site", "description": "Mining sites" },
+    "/users": { "schema": "User", "description": "System users" },
+    "/production": { "schema": "Production", "description": "Production logs" },
+    "/chantiers": { "schema": "Chantier", "description": "Chantier registry" },
+    "/engines": { "schema": "Engine", "description": "Equipment registry" },
+    "/maintenance": { "schema": "MaintenanceOrder", "description": "Maintenance history" },
+    "/stocks": { "schema": "Stock", "description": "Inventory management" },
+    "/logs": { "schema": "AuditLog", "description": "Security and audit trail" },
+    "/personnel": { "schema": "Personnel", "description": "Employee database" },
+    "/rotations_history": { "schema": "RotationHistory", "description": "Weekly rotation logs" },
+    "/daily_planning_sheets": { "schema": "DailyPlanningSheet", "description": "Daily planning sheet records" },
+    "/daily_planning_sheets/{sheetId}/modification_requests": { "schema": "ModificationRequest", "description": "Requests to reopen locked sheets" },
+    "/planning": { "schema": "Planning", "description": "Planning assignments" },
+    "/production_history": { "schema": "ProductionHistory", "description": "Workbook validation and action logs" },
+    "/deleted_plannings_log": { "schema": "DeletedPlanningLog", "description": "Deleted planning logs" },
+    "/non_realisation_explanations": { "schema": "NonRealisationExplanation", "description": "Explanations for non-realisation gaps" },
+    "/system_messages": { "schema": "SystemMessage", "description": "System messaging, notifications, read receipts, response telemetry, and drafts tracking" },
+    "/failed_blasts": { "schema": "FailedBlast", "description": "Failed blast tracking records" },
+    "/banned_ips": { "schema": "BannedIp", "description": "Active IP address bans" }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "projectId": "production-hydromines",
+  "appId": "1:164920868749:web:086b7218b6b6ce7f9c87c4",
+  "apiKey": "AIzaSyC905LLaoalVsGqCGKTHrXhfZw7PKjYDNI",
+  "authDomain": "production-hydromines.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-hydromines-a6fcbecb-aa8d-4505-8468-eee95f33de8d",
+  "storageBucket": "production-hydromines.firebasestorage.app",
+  "messagingSenderId": "164920868749",
+  "measurementId": "",
+  "oAuthClientId": "164920868749-rn74tm5b0t27b2p6kiuflrge1e6skbb0.apps.googleusercontent.com"
+}
